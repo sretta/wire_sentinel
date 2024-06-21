@@ -1,0 +1,19 @@
+[package]
+name = "WireSentinel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+error-chain = "0.12"
+log = "0.4"
+fern = "0.6"
+humantime = "2.1"
+
+toml = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_derive = "1.0"
+
+pest = "2.7"
+pest_derive = "2.7"
+
+ureq = { version = "2.9", features = ["tls", "native-certs", "gzip"] }
