@@ -1,5 +1,5 @@
 [package]
-name = "WireSentinel"
+name = "wire_sentinel"
 version = "0.1.0"
 edition = "2021"
 

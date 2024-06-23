@@ -29,7 +29,7 @@ pub fn update_peer(config: &SentinelConfig) -> Result<(), Error> {
         log::trace!("wg endpoint update succeeded for {wg_interface}");
         Ok(())
     } else {
-        // charset errors are systematic and need to fix on system level
+        // charset errors are systematic and need to be fixed on system level
         let err = String::from_utf8(output.stderr).unwrap();
         log::error!("wg endpoint update failed for {wg_interface}: {err}");
         Ok(())
