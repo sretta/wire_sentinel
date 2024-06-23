@@ -12,12 +12,10 @@ pub fn update_record(config: &SentinelConfig, change: &IpV6Address) -> Result<()
 
     log::trace!("Updating hostname {own_hostname} with IPv6 address {own_ipv6_address}.");
 
-    // TODO https://api.gandi.net/v5/livedns/domains/{fqdn}/records/{rrset_name}/{rrset_type}
-    let url = format!("https://api.gandi.net/v5/livedns/domains/{domain}/records/{own_hostname}");
+    let url = format!("https://api.gandi.net/v5/livedns/domains/{domain}/records/{own_hostname}/AAAA");
     let authorization_header = format!("Bearer {bearer_token}");
-    let request_body = format!("{{\"items\":[{{\"rrset_type\":\"AAAA\",\"rrset_values\":[\"{own_ipv6_address}\"]}}]}}");
+    let request_body = format!("{{\"rrset_values\":[\"{own_ipv6_address}\"],\"rrset_ttl\":300}}");
 
-    // https://api.gandi.net/docs/livedns/#v5-livedns-domains-fqdn-records-rrset_name
     let response_body: String = ureq::put(url.as_str())
         .timeout(Duration::from_secs(5))
         .set("authorization", authorization_header.as_str())
