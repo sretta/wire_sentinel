@@ -6,14 +6,15 @@ edition = "2021"
 [dependencies]
 error-chain = "0.12"
 log = "0.4"
-fern = "0.6"
-humantime = "2.1"
+fern = "0.7"
+humantime = "2.2"
 
 toml = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
 
-pest = "2.7"
-pest_derive = "2.7"
+pest = "2.8"
+pest_derive = "2.8"
 
-ureq = { version = "2.9", features = ["tls", "native-certs", "gzip"] }
+ureq = { version = "3.0", default-features = false, features = ["rustls-no-provider", "native-tls", "gzip"] }
+openssl = { version = "0.10", features = ["vendored"] }

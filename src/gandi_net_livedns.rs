@@ -1,6 +1,9 @@
 use log;
 use std::time::Duration;
 use ureq::Error;
+use ureq::Agent;
+use ureq::config::Config;
+use ureq::tls::{TlsConfig, TlsProvider};
 use crate::config::SentinelConfig;
 use crate::address_change::IpV6Address;
 
@@ -16,12 +19,23 @@ pub fn update_record(config: &SentinelConfig, change: &IpV6Address) -> Result<()
     let authorization_header = format!("Bearer {bearer_token}");
     let request_body = format!("{{\"rrset_values\":[\"{own_ipv6_address}\"],\"rrset_ttl\":300}}");
 
-    let response_body: String = ureq::put(url.as_str())
-        .timeout(Duration::from_secs(5))
-        .set("authorization", authorization_header.as_str())
-        .set("content-type", "application/json")
-        .send_string(request_body.as_str())?
-        .into_string()?;
+    let mut config = Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(5)))
+        .tls_config(
+            TlsConfig::builder()
+                .provider(TlsProvider::NativeTls)
+                .build()
+        )
+        .build();
+
+    let agent: Agent = config.into();
+
+    let response_body: String = agent.put(url.as_str())
+        .header("authorization", authorization_header.as_str())
+        .header("content-type", "application/json")
+        .send(request_body.as_str())?
+        .body_mut()
+        .read_to_string()?;
 
     log::trace!("update dyndns response succeeded with response: {response_body}.");
 
