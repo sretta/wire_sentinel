@@ -1,15 +1,15 @@
-use std::time::SystemTime;
-use crate::config::SentinelConfig;
-use crate::ip_monitor::{IpMonitorContext};
-use log;
 use crate::address_change::{AddressChange, AddressScope};
+use crate::config::SentinelConfig;
+use crate::ip_monitor::IpMonitorContext;
+use log;
+use std::time::SystemTime;
 
+mod address_change;
 mod config;
+mod gandi_net_livedns;
 mod ip_monitor;
 mod parse_monitor;
-mod gandi_net_livedns;
 mod wireguard_peer;
-mod address_change;
 
 fn setup_logger() -> Result<(), fern::InitError> {
     fern::Dispatch::new()
@@ -66,14 +66,16 @@ fn start_main_loop(config: &SentinelConfig) -> Result<(), Box<dyn std::error::Er
                             if wireguard_needs_update {
                                 let wireguard_result = wireguard_peer::update_peer(&config);
                                 match wireguard_result {
-                                    Ok(_) => {
-                                        wireguard_needs_update = false
+                                    Ok(_) => wireguard_needs_update = false,
+                                    Err(failure) => {
+                                        log::error!("wireguard update failed: {:?}", failure)
                                     }
-                                    Err(failure) => { log::error!("wireguard update failed: {:?}", failure) }
                                 }
                             }
                         }
-                        Err(failure) => { log::error!("gandi update failed: {:?}", failure) }
+                        Err(failure) => {
+                            log::error!("gandi update failed: {:?}", failure)
+                        }
                     }
                 }
                 Some(AddressChange::DeletionV6(_)) => {}
@@ -87,17 +89,14 @@ fn start_main_loop(config: &SentinelConfig) -> Result<(), Box<dyn std::error::Er
 
 fn is_relevant(change: &AddressChange) -> bool {
     match change {
-        AddressChange::AdditionV4(_) => { false }
-        AddressChange::AdditionV6(v6) => {
-            match v6.scope {
-                AddressScope::Link => { false }
-                AddressScope::Global => {
-                    (!v6.address.starts_with("fd"))
-                        && (!v6.address.starts_with("fec"))
-                }
+        AddressChange::AdditionV4(_) => false,
+        AddressChange::AdditionV6(v6) => match v6.scope {
+            AddressScope::Link => false,
+            AddressScope::Global => {
+                (!v6.address.starts_with("fd")) && (!v6.address.starts_with("fec"))
             }
-        }
-        AddressChange::DeletionV4(_) => { false }
-        AddressChange::DeletionV6(_) => { false }
+        },
+        AddressChange::DeletionV4(_) => false,
+        AddressChange::DeletionV6(_) => false,
     }
 }
