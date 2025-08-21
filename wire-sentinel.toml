@@ -1,0 +1,8 @@
+[config]
+internal_interface = "eth0"
+wg_interface = "wg0"
+bearer_token = "YOUR_GANDI_API_KEY"
+domain = "your.domain.tld"
+peer_pubkey = "YOUR_PEER_PUBLIC_KEY"
+peer_hostname = "peer-hostname"
+own_hostname = "own-hostname"
