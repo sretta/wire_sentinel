@@ -1,0 +1,11 @@
+#!/sbin/openrc-run
+
+command="/usr/local/bin/wire_sentinel"
+command_background=true
+pidfile="/run/${RC_SVCNAME}.pid"
+directory="/etc/wire-sentinel"
+
+depend() {
+    need net
+    after firewall
+}
