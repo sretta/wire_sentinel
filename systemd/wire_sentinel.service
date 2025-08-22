@@ -3,10 +3,8 @@ Description=Wire Sentinel - Monitors for IP address changes and updates DNS and 
 After=network.target
 
 [Service]
-User=wire_sentinel
-Group=wire_sentinel
-WorkingDirectory=/opt/wire_sentinel
-ExecStart=/usr/local/bin/wire_sentinel
+WorkingDirectory=/etc/wire-sentinel
+ExecStart=/opt/wire-sentinel/bin/wire_sentinel
 Restart=on-failure
 StandardOutput=journal
 StandardError=journal

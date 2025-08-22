@@ -19,14 +19,12 @@ sudo mkdir -p /opt/wire-sentinel/bin
 echo "Copying wire_sentinel binary to /usr/local/bin/"
 sudo cp target/release/wire_sentinel /opt/wire-sentinel/bin/
 
-echo "Copying wire-sentinel init script to /etc/init.d/"
-sudo cp alpine/wire-sentinel /etc/init.d/
+echo "Copy the service file to the systemd directory"
+sudo cp systemd/wire_sentinel.service /etc/systemd/system/
 
-echo "Making init script executable..."
-sudo chmod +x /etc/init.d/wire-sentinel
-
-echo "Adding wire-sentinel service to default runlevel & start it"
-sudo rc-update add wire-sentinel default
-sudo rc-service wire-sentinel start
+echo "enable & start wire-sentinel service"
+sudo systemctl daemon-reload
+sudo systemctl enable wire_sentinel.service
+sudo systemctl start wire_sentinel.service
 
 echo "Installation complete."
