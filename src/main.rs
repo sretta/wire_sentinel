@@ -1,8 +1,8 @@
-use crate::address_change::{AddressChange, AddressScope};
 use crate::config::SentinelConfig;
-use crate::ip_monitor::IpMonitorContext;
 use log;
 use std::time::SystemTime;
+use tokio::sync::broadcast;
+use crate::actors::{GandiUpdaterActor, IpMonitorActor, WireguardUpdaterActor};
 
 mod address_change;
 mod config;
@@ -10,6 +10,7 @@ mod gandi_net_livedns;
 mod ip_monitor;
 mod parse_monitor;
 mod wireguard_peer;
+mod actors;
 
 fn setup_logger() -> Result<(), fern::InitError> {
     fern::Dispatch::new()
@@ -28,75 +29,44 @@ fn setup_logger() -> Result<(), fern::InitError> {
     Ok(())
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_logger()?;
 
     let config = config::load_config()?;
-    start_main_loop(&config)?;
+    start_actors(config).await?;
 
     Ok(())
 }
 
-fn start_main_loop(config: &SentinelConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let mut ip_monitor_context = IpMonitorContext::initialize(config)?;
+async fn start_actors(config: SentinelConfig) -> Result<(), Box<dyn std::error::Error>> {
+    let (tx, rx1) = broadcast::channel(16);
+    let rx2 = tx.subscribe();
 
-    let mut applicable_change = Box::new(None);
-    let mut gandi_needs_update = false;
-    let mut wireguard_needs_update = false;
+    let ip_monitor_actor = IpMonitorActor::new(config.clone(), tx);
+    let gandi_updater_actor = GandiUpdaterActor::new(config.clone(), rx1);
+    let wireguard_updater_actor = WireguardUpdaterActor::new(config.clone(), rx2);
 
-    loop {
-        log::trace!("Entering main loop.");
+    let ip_monitor_handle = tokio::spawn(async move {
+        let mut actor = ip_monitor_actor;
+        actor.run().await;
+    });
 
-        let change = ip_monitor_context.listen_for_addr_changes()?;
+    let gandi_updater_handle = tokio::spawn(async move {
+        let mut actor = gandi_updater_actor;
+        actor.run().await;
+    });
 
-        if is_relevant(&change) {
-            applicable_change = Box::new(Some(change));
-            gandi_needs_update = true;
-            wireguard_needs_update = true;
-        }
+    let wireguard_updater_handle = tokio::spawn(async move {
+        let mut actor = wireguard_updater_actor;
+        actor.run().await;
+    });
 
-        if gandi_needs_update {
-            match applicable_change.as_ref() {
-                Some(AddressChange::AdditionV6(address)) => {
-                    let gandi_result = gandi_net_livedns::update_record(&config, address);
-                    match gandi_result {
-                        Ok(_) => {
-                            gandi_needs_update = false;
+    tokio::try_join!(
+        ip_monitor_handle,
+        gandi_updater_handle,
+        wireguard_updater_handle
+    )?;
 
-                            if wireguard_needs_update {
-                                let wireguard_result = wireguard_peer::update_peer(&config);
-                                match wireguard_result {
-                                    Ok(_) => wireguard_needs_update = false,
-                                    Err(failure) => {
-                                        log::error!("wireguard update failed: {:?}", failure)
-                                    }
-                                }
-                            }
-                        }
-                        Err(failure) => {
-                            log::error!("gandi update failed: {:?}", failure)
-                        }
-                    }
-                }
-                Some(AddressChange::DeletionV6(_)) => {}
-                Some(AddressChange::AdditionV4(_)) => {}
-                Some(AddressChange::DeletionV4(_)) => {}
-                None => {}
-            }
-        }
-    }
-}
-
-fn is_relevant(change: &AddressChange) -> bool {
-    match change {
-        AddressChange::AdditionV4(_) => false,
-        AddressChange::AdditionV6(v6) => match v6.scope {
-            AddressScope::Link => false,
-            AddressScope::Global => {
-                (!v6.address.starts_with("fd")) && (!v6.address.starts_with("fec"))
-            }
-        },
-        AddressChange::DeletionV4(_) => false,
-        AddressChange::DeletionV6(_) => false,
-    }
+    Ok(())
 }

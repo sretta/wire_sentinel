@@ -3,12 +3,12 @@ use std::io::Error;
 use serde_derive::Deserialize;
 use log;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct Data {
     config: SentinelConfig,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct SentinelConfig {
     pub internal_interface: String,
     // TODO listen to three interfaces
