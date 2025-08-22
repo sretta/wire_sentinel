@@ -1,6 +1,6 @@
 #!/sbin/openrc-run
 
-command="/usr/local/bin/wire_sentinel"
+command="/opt/wire-sentinel/bin"
 command_background=true
 pidfile="/run/${RC_SVCNAME}.pid"
 directory="/etc/wire-sentinel"
