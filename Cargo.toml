@@ -18,3 +18,7 @@ pest_derive = "2.8"
 
 ureq = { version = "3.0", default-features = false, features = ["rustls-no-provider", "native-tls", "gzip"] }
 openssl = { version = "0.10", features = ["vendored"] }
+
+smol = "2.0"
+futures = "0.3"
+async-channel = "2.3"

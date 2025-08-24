@@ -8,7 +8,7 @@ struct Data {
     config: SentinelConfig,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct SentinelConfig {
     pub internal_interface: String,
     // TODO listen to three interfaces
