@@ -1,8 +1,10 @@
-use crate::address_change::{AddressChange, AddressScope};
-use crate::config::SentinelConfig;
-use crate::ip_monitor::IpMonitorContext;
 use log;
+use std::sync::mpsc;
+use std::thread;
 use std::time::SystemTime;
+use crate::gandi_actor::GandiActor;
+use crate::input_actor::InputActor;
+use crate::wireguard_actor::WireguardActor;
 
 mod address_change;
 mod config;
@@ -10,6 +12,10 @@ mod gandi_net_livedns;
 mod ip_monitor;
 mod parse_monitor;
 mod wireguard_peer;
+mod actor_messages;
+mod input_actor;
+mod gandi_actor;
+mod wireguard_actor;
 
 fn setup_logger() -> Result<(), fern::InitError> {
     fern::Dispatch::new()
@@ -32,71 +38,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_logger()?;
 
     let config = config::load_config()?;
-    start_main_loop(&config)?;
+
+    // Create channels
+    let (gandi_sender, gandi_receiver) = mpsc::channel();
+    let (wireguard_sender, wireguard_receiver) = mpsc::channel();
+
+    // Create actors
+    let input_actor = InputActor::new(config.clone(), gandi_sender, wireguard_sender);
+    let gandi_actor = GandiActor::new(config.clone(), gandi_receiver);
+    let wireguard_actor = WireguardActor::new(config.clone(), wireguard_receiver);
+
+    // Start actors
+    input_actor.start();
+    gandi_actor.start();
+    wireguard_actor.start();
+
+    // Wait forever
+    thread::park();
 
     Ok(())
-}
-
-fn start_main_loop(config: &SentinelConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let mut ip_monitor_context = IpMonitorContext::initialize(config)?;
-
-    let mut applicable_change = Box::new(None);
-    let mut gandi_needs_update = false;
-    let mut wireguard_needs_update = false;
-
-    loop {
-        log::trace!("Entering main loop.");
-
-        let change = ip_monitor_context.listen_for_addr_changes()?;
-
-        if is_relevant(&change) {
-            applicable_change = Box::new(Some(change));
-            gandi_needs_update = true;
-            wireguard_needs_update = true;
-        }
-
-        if gandi_needs_update {
-            match applicable_change.as_ref() {
-                Some(AddressChange::AdditionV6(address)) => {
-                    let gandi_result = gandi_net_livedns::update_record(&config, address);
-                    match gandi_result {
-                        Ok(_) => {
-                            gandi_needs_update = false;
-
-                            if wireguard_needs_update {
-                                let wireguard_result = wireguard_peer::update_peer(&config);
-                                match wireguard_result {
-                                    Ok(_) => wireguard_needs_update = false,
-                                    Err(failure) => {
-                                        log::error!("wireguard update failed: {:?}", failure)
-                                    }
-                                }
-                            }
-                        }
-                        Err(failure) => {
-                            log::error!("gandi update failed: {:?}", failure)
-                        }
-                    }
-                }
-                Some(AddressChange::DeletionV6(_)) => {}
-                Some(AddressChange::AdditionV4(_)) => {}
-                Some(AddressChange::DeletionV4(_)) => {}
-                None => {}
-            }
-        }
-    }
-}
-
-fn is_relevant(change: &AddressChange) -> bool {
-    match change {
-        AddressChange::AdditionV4(_) => false,
-        AddressChange::AdditionV6(v6) => match v6.scope {
-            AddressScope::Link => false,
-            AddressScope::Global => {
-                (!v6.address.starts_with("fd")) && (!v6.address.starts_with("fec"))
-            }
-        },
-        AddressChange::DeletionV4(_) => false,
-        AddressChange::DeletionV6(_) => false,
-    }
 }
